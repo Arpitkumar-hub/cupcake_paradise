@@ -100,7 +100,7 @@ function Navbar() {
           {/* Button */}
           <a
             href="#contact"
-            className="bg-pink-500 hover:bg-pink-600 text-white p-4 rounded-full font-semibold transition hover:scale-105"
+            className="bg-pink-500 hover:bg-pink-600 text-white px-6 py-3 rounded-full font-semibold transition hover:scale-105"
           >
             Order Now
           </a>
