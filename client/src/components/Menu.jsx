@@ -74,32 +74,32 @@ setProducts(data);
   return (
     <section
       id="menu"
-      className="pt-32 pb-24 bg-gradient-to-b from-pink-50 via-white to-rose-50"
+      className="bg-linear-to-b from-pink-50 via-white to-rose-50"
     >
-      <div className="max-w-7xl mx-auto px-6 lg:px-8">
+      <div className="px-6 lg:px-8 w-full flex-col items-center justify-center">
 
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="flex-column items-center justify-center w-screen"
         >
-          <span className="uppercase tracking-[5px] text-pink-500 font-semibold">
+          <div className="uppercase tracking-[3px] text-pink-500 font-semibold ml-4 text-center">
             Our Menu
-          </span>
+          </div>
 
-          <h2 className="text-5xl lg:text-6xl font-bold text-gray-800 mt-4">
+          <h2 className="text-5xl lg:text-6xl font-bold text-gray-800 mt-4 mx-auto w-fit">
             Delicious Cupcakes
           </h2>
 
-          <p className="mt-6 text-gray-500 text-lg max-w-2xl mx-auto">
+          <p className="mt-6 text-gray-500 text-lg max-w-2xl mx-auto text-center">
             Freshly baked every day using premium ingredients. Find your
             favorite cupcake below.
           </p>
         </motion.div>
 
-        <div className="max-w-xl mx-auto relative mb-12">
+        <div className="max-w-xl mb-12 mx-auto">
           <Search
             size={20}
             className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400"

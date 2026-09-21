@@ -4,7 +4,7 @@
 
 Cupcake Paradise is a full-stack e-commerce application designed for a modern bakery business. Customers can browse cupcakes, search products, manage their cart, checkout, and make payments using Razorpay Test Mode.
 
-The platform also includes a dedicated admin dashboard for managing products, orders, payments, order statuses, and revenue.
+The platform also includes a dedicated admin dashboard for managing products, orders, payment status, order statuses, and revenue.
 
 ---
 
@@ -19,8 +19,9 @@ The platform also includes a dedicated admin dashboard for managing products, or
 - 🗑️ Remove products from cart
 - 💰 Automatic cart total calculation
 - 📦 Checkout with customer details
+- 📍 Enter delivery address
 - 💳 Razorpay payment integration
-- 🔐 Payment verification
+- 🔐 Payment signature verification
 - ✅ Payment success handling
 - 🎉 Order success page
 - 📱 Responsive user interface
@@ -45,9 +46,9 @@ The platform also includes a dedicated admin dashboard for managing products, or
 
 ---
 
-# 🛠️ Tech Stack
+## 🛠️ Tech Stack
 
-## Frontend
+### Frontend
 
 - React.js
 - React Router DOM
@@ -56,7 +57,7 @@ The platform also includes a dedicated admin dashboard for managing products, or
 - Vite
 - JavaScript
 
-## Backend
+### Backend
 
 - Node.js
 - Express.js
@@ -66,14 +67,14 @@ The platform also includes a dedicated admin dashboard for managing products, or
 - bcryptjs
 - REST API
 
-## Payment
+### Payment
 
 - Razorpay
 - Razorpay Checkout
 - Razorpay Orders API
 - Payment Signature Verification
 
-## Development Tools
+### Development Tools
 
 - Git
 - GitHub
@@ -83,42 +84,52 @@ The platform also includes a dedicated admin dashboard for managing products, or
 
 ---
 
-# 🏗️ Project Architecture
+## 🔄 Application Flow
 
 ```text
-Cupcake Paradise
-│
-├── client/                         # React Frontend
-│   ├── public/
-│   └── src/
-│       ├── animations/
-│       ├── api/
-│       ├── assets/
-│       │   ├── cupcakes/
-│       │   ├── gallery/
-│       │   └── menu/
-│       ├── components/
-│       │   └── admin/
-│       ├── context/
-│       ├── pages/
-│       │   └── admin/
-│       ├── services/
-│       ├── App.jsx
-│       ├── App.css
-│       ├── index.css
-│       └── main.jsx
-│
-├── server/                         # Node.js Backend
-│   ├── config/
-│   ├── controllers/
-│   ├── data/
-│   ├── middleware/
-│   ├── models/
-│   ├── routes/
-│   ├── seed.js
-│   └── server.js
-│
-├── .gitignore
-├── package.json
-├── package-lock.json
-└── README.md
+Customer
+   │
+   ▼
+Homepage
+   │
+   ▼
+Browse / Search Products
+   │
+   ▼
+Select Cupcake
+   │
+   ▼
+Add to Cart
+   │
+   ▼
+Shopping Cart
+   │
+   ▼
+Checkout
+   │
+   ▼
+Enter Customer Details
+   │
+   ▼
+Create Razorpay Order
+   │
+   ▼
+Razorpay Checkout
+   │
+   ▼
+Complete Test Payment
+   │
+   ▼
+Backend Payment Verification
+   │
+   ▼
+Save Order in MongoDB
+   │
+   ▼
+Payment Status: Paid
+   │
+   ▼
+Order Success Page
+   │
+   ▼
+Admin Dashboard
