@@ -1,12 +1,21 @@
+
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:5000/api/products",
+  baseURL: import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL.replace(/\/+$/, "")}/products`
+    : "http://localhost:5000/api/products",
 });
 
 // Get all products
 export const getProducts = async () => {
   const response = await API.get("/");
+  return response.data;
+};
+
+// Get single product
+export const getProductById = async (id) => {
+  const response = await API.get(`/${id}`);
   return response.data;
 };
 
