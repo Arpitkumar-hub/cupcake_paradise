@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
@@ -9,7 +10,6 @@ import {
 
 function Checkout() {
   const navigate = useNavigate();
-
   const { cart, totalPrice, clearCart } = useCart();
 
   const [customer, setCustomer] = useState({
@@ -22,174 +22,189 @@ function Checkout() {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
-    setCustomer({
-      ...customer,
+    setCustomer((previous) => ({
+      ...previous,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
-  // Load Razorpay Checkout
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
+  // Load Razorpay Checkout SDK
+  const loadRazorpayScript = () =>
+    new Promise((resolve) => {
       if (window.Razorpay) {
         resolve(true);
         return;
       }
 
       const script = document.createElement("script");
-
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
 
-      script.onload = () => resolve(true);
+      script.onload = () => resolve(!!window.Razorpay);
       script.onerror = () => resolve(false);
 
       document.body.appendChild(script);
     });
-  };
 
   const handlePlaceOrder = async () => {
-    // Validate customer details
+    if (loading) return;
+
+    const cleanCustomer = {
+      name: customer.name.trim(),
+      email: customer.email.trim(),
+      phone: customer.phone.trim(),
+      address: customer.address.trim(),
+    };
+
     if (
-      !customer.name ||
-      !customer.email ||
-      !customer.phone ||
-      !customer.address
+      !cleanCustomer.name ||
+      !cleanCustomer.email ||
+      !cleanCustomer.phone ||
+      !cleanCustomer.address
     ) {
-      alert("Please fill all fields.");
+      alert("Please fill in all customer details.");
       return;
     }
 
-    // Check cart
-    if (cart.length === 0) {
-      alert("Your cart is empty.");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanCustomer.email)) {
+      alert("Please enter a valid email address.");
+      return;
+    }
+
+    if (cart.length === 0 || !Number.isFinite(Number(totalPrice)) || Number(totalPrice) <= 0) {
+      alert("Your cart is empty or the total amount is invalid.");
+      return;
+    }
+
+    // Vite exposes this variable only if configured during frontend build.
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID?.trim();
+
+    if (!razorpayKey) {
+      alert(
+        "Razorpay Key ID is missing. Add VITE_RAZORPAY_KEY_ID in Render frontend Environment and redeploy."
+      );
       return;
     }
 
     try {
       setLoading(true);
 
-      // Load Razorpay
-      const razorpayLoaded = await loadRazorpayScript();
+      const sdkLoaded = await loadRazorpayScript();
 
-      if (!razorpayLoaded) {
-        alert("Razorpay failed to load.");
-        setLoading(false);
-        return;
+      if (!sdkLoaded) {
+        throw new Error("Unable to load Razorpay Checkout. Please try again.");
       }
 
-      // Create Razorpay order through backend
-      const paymentResponse = await createPaymentOrder(totalPrice);
+      // Ask backend to create a Razorpay order.
+      const paymentResponse = await createPaymentOrder(Number(totalPrice));
 
-      if (!paymentResponse.success) {
-        alert("Unable to create payment.");
-        setLoading(false);
-        return;
+      if (
+        !paymentResponse?.success ||
+        !paymentResponse?.order?.id ||
+        !paymentResponse?.order?.amount
+      ) {
+        throw new Error(
+          paymentResponse?.message || "The payment order could not be created."
+        );
       }
 
-      const razorpayOrder = paymentResponse.order;
+      const paymentOrder = paymentResponse.order;
 
-      // Razorpay options
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-
-        amount: razorpayOrder.amount,
-
-        currency: "INR",
-
+        key: razorpayKey,
+        amount: paymentOrder.amount,
+        currency: paymentOrder.currency || "INR",
         name: "Cupcake Paradise",
-
         description: "Cupcake Paradise Order",
-
-        order_id: razorpayOrder.id,
+        order_id: paymentOrder.id,
 
         prefill: {
-          name: customer.name,
-          email: customer.email,
-          contact: customer.phone,
+          name: cleanCustomer.name,
+          email: cleanCustomer.email,
+          contact: cleanCustomer.phone,
+        },
+
+        notes: {
+          delivery_address: cleanCustomer.address,
         },
 
         theme: {
           color: "#ec4899",
         },
 
-        handler: async function (response) {
+        handler: async (paymentResult) => {
           try {
-            // Verify payment
+            // Verify payment signature through the backend.
             const verification = await verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
+              razorpay_order_id: paymentResult.razorpay_order_id,
+              razorpay_payment_id: paymentResult.razorpay_payment_id,
+              razorpay_signature: paymentResult.razorpay_signature,
             });
 
-            if (!verification.success) {
-              alert("Payment verification failed.");
-              setLoading(false);
-              return;
+            if (!verification?.success) {
+              throw new Error("Payment verification failed.");
             }
 
-            // Create order ONLY after successful payment
+            // Create the store order only after verification succeeds.
             const orderData = {
-              customer,
-
+              customer: cleanCustomer,
               items: cart.map((item) => ({
                 productId: item._id,
                 name: item.name,
                 price: item.price,
                 quantity: item.quantity,
               })),
-
-              totalPrice,
-
-              paymentId: response.razorpay_payment_id,
-
-              paymentOrderId: response.razorpay_order_id,
-
+              totalPrice: Number(totalPrice),
+              paymentId: paymentResult.razorpay_payment_id,
+              paymentOrderId: paymentResult.razorpay_order_id,
               paymentStatus: "Paid",
             };
 
             await createOrder(orderData);
 
             clearCart();
-
-            alert("Payment successful! Order placed.");
-
+            alert("Payment successful! Your order has been placed.");
             navigate("/success");
           } catch (error) {
-            console.error("Payment verification error:", error);
+            console.error("Payment verification/order error:", error);
 
             alert(
-              "Payment was completed but order verification failed."
+              "We could not confirm order placement. If money was deducted, please contact support before attempting another payment."
             );
-
+          } finally {
             setLoading(false);
           }
         },
 
         modal: {
-          ondismiss: function () {
+          ondismiss: () => {
             setLoading(false);
           },
         },
       };
 
-      // Open Razorpay
-      const razorpay = new window.Razorpay(options);
+      const checkout = new window.Razorpay(options);
 
-      razorpay.on("payment.failed", function (response) {
-        console.error("Payment failed:", response.error);
+      checkout.on("payment.failed", (event) => {
+        console.error("Razorpay payment failed:", event.error);
 
         alert(
-          response.error.description || "Payment failed. Please try again."
+          event.error?.description ||
+            "Payment failed. Please try again."
         );
 
         setLoading(false);
       });
 
-      razorpay.open();
+      checkout.open();
     } catch (error) {
-      console.error("Payment Error:", error);
+      console.error("Checkout initialization error:", error);
 
-      alert("Unable to start payment. Please try again.");
+      alert(
+        error.response?.data?.message ||
+          error.message ||
+          "Unable to start payment. Please try again."
+      );
 
       setLoading(false);
     }
@@ -197,101 +212,116 @@ function Checkout() {
 
   return (
     <div className="min-h-screen bg-pink-50 py-12 px-6">
-      <div className="max-w-5xl mx-auto bg-white rounded-3xl shadow-xl p-10">
-
-        <h1 className="text-4xl font-bold text-center text-pink-600 mb-10">
+      <div className="max-w-5xl mx-auto rounded-3xl bg-white p-6 shadow-xl md:p-10">
+        <h1 className="mb-10 text-center text-4xl font-bold text-pink-600">
           Checkout
         </h1>
 
-        <div className="grid md:grid-cols-2 gap-10">
-
+        <div className="grid gap-10 md:grid-cols-2">
           {/* Customer Details */}
-          <div>
-            <h2 className="text-2xl font-bold mb-6">
+          <section>
+            <h2 className="mb-6 text-2xl font-bold">
               Customer Details
             </h2>
 
-            <input
-              type="text"
-              name="name"
-              placeholder="Full Name"
-              value={customer.name}
-              onChange={handleChange}
-              className="w-full border rounded-lg p-3 mb-4"
-            />
+            <form
+              id="checkout-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handlePlaceOrder();
+              }}
+              className="space-y-4"
+            >
+              <input
+                type="text"
+                name="name"
+                placeholder="Full Name"
+                autoComplete="name"
+                value={customer.name}
+                onChange={handleChange}
+                className="w-full rounded-lg border p-3"
+                required
+              />
 
-            <input
-              type="email"
-              name="email"
-              placeholder="Email"
-              value={customer.email}
-              onChange={handleChange}
-              className="w-full border rounded-lg p-3 mb-4"
-            />
+              <input
+                type="email"
+                name="email"
+                placeholder="Email Address"
+                autoComplete="email"
+                value={customer.email}
+                onChange={handleChange}
+                className="w-full rounded-lg border p-3"
+                required
+              />
 
-            <input
-              type="text"
-              name="phone"
-              placeholder="Phone Number"
-              value={customer.phone}
-              onChange={handleChange}
-              className="w-full border rounded-lg p-3 mb-4"
-            />
+              <input
+                type="tel"
+                name="phone"
+                placeholder="Phone Number"
+                autoComplete="tel"
+                value={customer.phone}
+                onChange={handleChange}
+                className="w-full rounded-lg border p-3"
+                required
+              />
 
-            <textarea
-              name="address"
-              placeholder="Delivery Address"
-              value={customer.address}
-              onChange={handleChange}
-              rows="5"
-              className="w-full border rounded-lg p-3"
-            />
-          </div>
+              <textarea
+                name="address"
+                placeholder="Delivery Address"
+                autoComplete="street-address"
+                value={customer.address}
+                onChange={handleChange}
+                rows={5}
+                className="w-full rounded-lg border p-3"
+                required
+              />
+            </form>
+          </section>
 
           {/* Order Summary */}
-          <div>
-            <h2 className="text-2xl font-bold mb-6">
+          <section>
+            <h2 className="mb-6 text-2xl font-bold">
               Order Summary
             </h2>
 
             {cart.map((item) => (
               <div
                 key={item._id}
-                className="flex justify-between border-b py-3"
+                className="flex justify-between gap-4 border-b py-3"
               >
                 <div>
-                  <p className="font-semibold">
-                    {item.name}
-                  </p>
-
+                  <p className="font-semibold">{item.name}</p>
                   <p className="text-gray-500">
-                    Qty: {item.quantity}
+                    Quantity: {item.quantity}
                   </p>
                 </div>
 
                 <p className="font-bold">
-                  ₹{item.price * item.quantity}
+                  ₹{Number(item.price) * Number(item.quantity)}
                 </p>
               </div>
             ))}
 
-            <div className="flex justify-between text-2xl font-bold mt-8">
+            <div className="mt-8 flex justify-between text-2xl font-bold">
               <span>Total</span>
-
               <span>₹{totalPrice}</span>
             </div>
 
             <button
-              onClick={handlePlaceOrder}
-              disabled={loading}
-              className="mt-8 w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-400 text-white py-4 rounded-full text-lg font-semibold transition"
+              type="submit"
+              form="checkout-form"
+              disabled={loading || cart.length === 0}
+              className="mt-8 w-full rounded-full bg-pink-500 py-4 text-lg font-semibold text-white transition hover:bg-pink-600 disabled:cursor-not-allowed disabled:bg-gray-400"
             >
               {loading
                 ? "Processing Payment..."
-                : `💳 Pay ₹${totalPrice}`}
+                : `Pay ₹${totalPrice}`}
             </button>
-          </div>
 
+            <p className="mt-4 text-center text-sm text-gray-500">
+              Your payment is processed securely through Razorpay.
+            </p>
+          </section>
         </div>
       </div>
     </div>
